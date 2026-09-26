@@ -554,6 +554,7 @@ def log_method(
 
         logger = logging.getLogger(func.__module__)
         signature = inspect.signature(func)
+        method_name = _get_method_name(func)
 
         @functools.wraps(func)
         def logged_method(
@@ -561,7 +562,6 @@ def log_method(
             **kwargs: _P.kwargs,
         ) -> _R:
 
-            method_name = _get_method_name(func)
             start_time = time.perf_counter()
 
             _log_start(
@@ -751,6 +751,7 @@ def log_generator(
 
         logger = logging.getLogger(func.__module__)
         signature = inspect.signature(func)
+        method_name = _get_method_name(func)
 
         @functools.wraps(func)
         def logged_generator(
@@ -758,7 +759,6 @@ def log_generator(
             **kwargs: _P.kwargs,
         ) -> Iterator[_YieldT]:
 
-            method_name = _get_method_name(func)
             start_time = time.perf_counter()
 
             previous_logged_yield_time = start_time
