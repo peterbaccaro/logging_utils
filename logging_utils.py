@@ -276,7 +276,7 @@ def _log_exception(
     Logging errors are deliberately ignored so they never mask the application
     exception.
     """
-    if not log_exceptions:
+    if not log_exceptions or not logger.isEnabledFor(logging.ERROR):
         return
 
     parts = [
@@ -331,7 +331,7 @@ def _log_start(
         max_arg_length: Maximum length for each formatted argument value.
     """
 
-    if not log_start:
+    if not log_start or not logger.isEnabledFor(log_level):
         return
 
     parts = [
@@ -395,6 +395,9 @@ def _log_end(
         log_duration: Whether to include total elapsed time.
         extra_fields: Additional fields to include after the run ID.
     """
+    if not logger.isEnabledFor(log_level):
+        return
+
     parts = [
         f"END {method_name}",
         f"status={status}",
@@ -444,6 +447,9 @@ def _log_yield(
         interval_duration_ms: Time since the previous logged yield, if enabled.
         final: Whether this is the final yield event.
     """
+    if not logger.isEnabledFor(log_level):
+        return
+
     parts = [
         f"YIELD {method_name}",
         f"item={item_number}",
@@ -606,11 +612,12 @@ def log_method(
 
             extra_fields = []
 
-            if log_result_metadata:
-                extra_fields.append(_get_result_metadata(result))
+            if logger.isEnabledFor(log_level):
+                if log_result_metadata:
+                    extra_fields.append(_get_result_metadata(result))
 
-            if log_result:
-                extra_fields.append(f"result={_format_value(
+                if log_result:
+                    extra_fields.append(f"result={_format_value(
                         result,
                         max_result_length,
                     )}")
@@ -798,7 +805,7 @@ def log_generator(
                         log_yields_every is None or count % log_yields_every == 0
                     )
 
-                    if should_log_yield:
+                    if should_log_yield and logger.isEnabledFor(log_level):
 
                         interval_duration_ms = None
                         if log_yield_interval_duration:
@@ -858,6 +865,7 @@ def log_generator(
                     and log_yields
                     and has_yielded
                     and count != last_logged_yield_count
+                    and logger.isEnabledFor(log_level)
                 ):
 
                     _log_yield(
@@ -878,7 +886,7 @@ def log_generator(
 
                 extra_fields = []
 
-                if log_result_metadata:
+                if log_result_metadata and logger.isEnabledFor(log_level):
                     extra_fields.extend(
                         [
                             "result_type=generator",
