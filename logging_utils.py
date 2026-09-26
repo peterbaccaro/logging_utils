@@ -646,7 +646,7 @@ def log_generator(
     log_yield_result: bool = False,
     log_final_yield: bool = False,
     log_yield_interval_duration: bool = False,
-    log_result_metadata: bool = False,
+    log_generator_metadata: bool = False,
     log_exceptions: bool = True,
     log_duration: bool = False,
     log_level: int = logging.INFO,
@@ -685,9 +685,9 @@ def log_generator(
             Whether to log time since the previous logged item. With
             log_yields_every, this measures time between logged checkpoints.
 
-        log_result_metadata:
-            Whether to log generator metadata and the number of items yielded
-            at the END event.
+        log_generator_metadata:
+            Whether to log ``items_yielded`` and, when available,
+            ``yielded_type`` at the END event.
 
         log_exceptions:
             Whether to log exceptions and the number of items yielded before
@@ -887,7 +887,7 @@ def log_generator(
 
                 extra_fields = []
 
-                if log_result_metadata and logger.isEnabledFor(log_level):
+                if log_generator_metadata and logger.isEnabledFor(log_level):
                     extra_fields.append(f"items_yielded={count}")
                     if yielded_type is not None:
                         yielded_type_name = (
