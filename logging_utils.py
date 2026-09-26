@@ -52,6 +52,7 @@ _run_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     default=None,
 )
 
+
 def get_run_id() -> str | None:
     """
     Return the correlation ID for the current execution context.
@@ -777,6 +778,8 @@ def log_generator(
 
             count = 0
             last_yielded_result: Any = None
+            yielded_type: type[Any] | None = None
+            mixed_yield_types = False
             has_yielded = False
             last_logged_yield_count = 0
 
@@ -792,6 +795,12 @@ def log_generator(
                     count += 1
                     has_yielded = True
                     last_yielded_result = result
+
+                    result_type = type(result)
+                    if yielded_type is None:
+                        yielded_type = result_type
+                    elif result_type is not yielded_type:
+                        mixed_yield_types = True
 
                     should_log_yield = log_yields and (
                         log_yields_every is None or count % log_yields_every == 0
@@ -879,12 +888,12 @@ def log_generator(
                 extra_fields = []
 
                 if log_result_metadata and logger.isEnabledFor(log_level):
-                    extra_fields.extend(
-                        [
-                            "result_type=generator",
-                            f"items_yielded={count}",
-                        ]
-                    )
+                    extra_fields.append(f"items_yielded={count}")
+                    if yielded_type is not None:
+                        yielded_type_name = (
+                            "mixed" if mixed_yield_types else yielded_type.__name__
+                        )
+                        extra_fields.append(f"yielded_type={yielded_type_name}")
 
                 _log_end(
                     logger=logger,
