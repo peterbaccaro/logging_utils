@@ -63,7 +63,7 @@ def get_run_id() -> str | None:
 
 
 @contextmanager
-def run_id_context(run_id: str | None) -> Generator[None, None, None]:
+def run_context(run_id: str | None) -> Generator[None, None, None]:
     """Temporarily set the correlation ID for the current context.
 
     Args:
