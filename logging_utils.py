@@ -417,6 +417,62 @@ def _log_end(
     )
 
 
+def _log_yield(
+    *,
+    logger: logging.Logger,
+    log_level: int,
+    method_name: str,
+    item_number: int,
+    start_time: float,
+    result: Any,
+    log_yield_result: bool,
+    max_yield_length: int,
+    interval_duration_ms: float | None = None,
+    final: bool = False,
+) -> None:
+    """Build and log a YIELD event.
+
+    Args:
+        logger: Logger used to record the event.
+        log_level: Level for the YIELD event.
+        method_name: Qualified name of the generator.
+        item_number: One-based position of this yielded item.
+        start_time: Generator start time from ``time.perf_counter()``.
+        result: Yielded value to describe and optionally include.
+        log_yield_result: Whether to include the bounded value representation.
+        max_yield_length: Maximum length of the value representation.
+        interval_duration_ms: Time since the previous logged yield, if enabled.
+        final: Whether this is the final yield event.
+    """
+    parts = [
+        f"YIELD {method_name}",
+        f"item={item_number}",
+    ]
+
+    if final:
+        parts.append("final=true")
+
+    run_id_text = _get_run_id_text()
+
+    if run_id_text:
+        parts.append(run_id_text)
+
+    parts.append(_get_result_metadata(result))
+
+    if log_yield_result:
+        parts.append(f"result={_format_value(result, max_yield_length)}")
+
+    if interval_duration_ms is not None:
+        parts.append(f"interval_duration_ms={interval_duration_ms:.3f}")
+
+    parts.append(_format_elapsed(start_time))
+
+    logger.log(
+        log_level,
+        " ".join(parts),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Normal method decorator
 # ---------------------------------------------------------------------------
@@ -744,43 +800,24 @@ def log_generator(
 
                     if should_log_yield:
 
-                        parts = [
-                            f"YIELD {method_name}",
-                            f"item={count}",
-                        ]
-
-                        run_id_text = _get_run_id_text()
-
-                        if run_id_text:
-                            parts.append(run_id_text)
-
-                        parts.append(_get_result_metadata(result))
-
-                        if log_yield_result:
-                            parts.append(f"result={_format_value(
-                                    result,
-                                    max_yield_length,
-                                )}")
-
+                        interval_duration_ms = None
                         if log_yield_interval_duration:
-
                             now = time.perf_counter()
-
                             interval_duration_ms = (
                                 now - previous_logged_yield_time
                             ) * 1_000
-
-                            parts.append(
-                                "interval_duration_ms=" f"{interval_duration_ms:.3f}"
-                            )
-
                             previous_logged_yield_time = now
 
-                        parts.append(_format_elapsed(start_time))
-
-                        logger.log(
-                            log_level,
-                            " ".join(parts),
+                        _log_yield(
+                            logger=logger,
+                            log_level=log_level,
+                            method_name=method_name,
+                            item_number=count,
+                            start_time=start_time,
+                            result=result,
+                            log_yield_result=log_yield_result,
+                            max_yield_length=max_yield_length,
+                            interval_duration_ms=interval_duration_ms,
                         )
 
                         last_logged_yield_count = count
@@ -823,30 +860,16 @@ def log_generator(
                     and count != last_logged_yield_count
                 ):
 
-                    parts = [
-                        f"YIELD {method_name}",
-                        f"item={count}",
-                        "final=true",
-                    ]
-
-                    run_id_text = _get_run_id_text()
-
-                    if run_id_text:
-                        parts.append(run_id_text)
-
-                    parts.append(_get_result_metadata(last_yielded_result))
-
-                    if log_yield_result:
-                        parts.append(f"result={_format_value(
-                                last_yielded_result,
-                                max_yield_length,
-                            )}")
-
-                    parts.append(_format_elapsed(start_time))
-
-                    logger.log(
-                        log_level,
-                        " ".join(parts),
+                    _log_yield(
+                        logger=logger,
+                        log_level=log_level,
+                        method_name=method_name,
+                        item_number=count,
+                        start_time=start_time,
+                        result=last_yielded_result,
+                        log_yield_result=log_yield_result,
+                        max_yield_length=max_yield_length,
+                        final=True,
                     )
 
                 # -----------------------------------------------------------
