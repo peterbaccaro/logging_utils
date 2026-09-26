@@ -6,7 +6,7 @@ import inspect
 import logging
 import sys
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator, Iterator
 from contextlib import contextmanager
 from typing import Any, ParamSpec, TypeVar
 
@@ -74,7 +74,7 @@ def get_run_id() -> str | None:
 
 
 @contextmanager
-def run_id_context(run_id: str | None) -> Iterator[None]:
+def run_id_context(run_id: str | None) -> Generator[None, None, None]:
     """Temporarily set the correlation ID for the current context.
 
     Args:
