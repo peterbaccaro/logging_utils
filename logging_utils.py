@@ -172,7 +172,10 @@ def _format_value(
     Returns:
         The object's representation, truncated to at most max_length characters.
     """
-    result = repr(value)
+    try:
+        result = repr(value)
+    except Exception as exc:
+        return f"<unable to represent: {type(exc).__name__}>"
 
     if len(result) <= max_length:
         return result
