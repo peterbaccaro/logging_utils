@@ -52,17 +52,6 @@ _run_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     default=None,
 )
 
-
-def set_run_id(run_id: str | None) -> None:
-    """
-    Set the correlation ID for the current execution context.
-
-    Args:
-        run_id: ID to include in subsequent log messages, or None to clear it.
-    """
-    _run_id.set(run_id)
-
-
 def get_run_id() -> str | None:
     """
     Return the correlation ID for the current execution context.
