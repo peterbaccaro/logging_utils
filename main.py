@@ -32,17 +32,13 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Iterator
 
-from logging_utils import (
-    configure_logging,
-    log_generator,
-    log_method,
-    set_run_id,
-)
-
+from logging_utils import (configure_logging, log_generator, log_method,
+                           set_run_id)
 
 # ============================================================================
 # Configuration
 # ============================================================================
+
 
 @dataclass(frozen=True)
 class EtlConfig:
@@ -57,6 +53,7 @@ class EtlConfig:
 # ============================================================================
 # Source Reader
 # ============================================================================
+
 
 class SourceReader:
     """
@@ -113,6 +110,7 @@ class SourceReader:
 # Source -> Target Transformer
 # ============================================================================
 
+
 class SourceToTargetTransformer:
     """
     Transforms source records into the target data model.
@@ -148,6 +146,7 @@ class SourceToTargetTransformer:
 # ============================================================================
 # Target Writer
 # ============================================================================
+
 
 class TargetWriter:
     """
@@ -240,6 +239,7 @@ class TargetWriter:
 # ETL Orchestrator
 # ============================================================================
 
+
 class EtlOrchestrator:
     """
     Coordinates the ETL process.
@@ -274,14 +274,10 @@ class EtlOrchestrator:
         source_records = self.source_reader.read()
 
         # Source -> Target transformation
-        target_records = self.transformer.transform(
-            source_records
-        )
+        target_records = self.transformer.transform(source_records)
 
         # Target
-        result = self.target_writer.write(
-            target_records
-        )
+        result = self.target_writer.write(target_records)
 
         return result
 
@@ -289,6 +285,7 @@ class EtlOrchestrator:
 # ============================================================================
 # ETL Factory
 # ============================================================================
+
 
 class EtlFactory:
     """
@@ -331,6 +328,7 @@ class EtlFactory:
 # ============================================================================
 # Main
 # ============================================================================
+
 
 def main() -> None:
     """

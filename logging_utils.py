@@ -7,10 +7,10 @@ import time
 from collections.abc import Callable, Iterator
 from typing import Any
 
-
 # ---------------------------------------------------------------------------
 # Logging configuration
 # ---------------------------------------------------------------------------
+
 
 def configure_logging(level: int = logging.INFO) -> None:
     """
@@ -26,9 +26,7 @@ def configure_logging(level: int = logging.INFO) -> None:
         handler = logging.StreamHandler(sys.stdout)
 
         handler.setFormatter(
-            logging.Formatter(
-                "%(asctime)s %(levelname)s %(name)s - %(message)s"
-            )
+            logging.Formatter("%(asctime)s %(levelname)s %(name)s - %(message)s")
         )
 
         root_logger.addHandler(handler)
@@ -81,6 +79,7 @@ _DEFAULT_REDACT_ARGS = {
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+
 def _get_method_name(func: Callable[..., Any]) -> str:
     """Return the qualified function or method name."""
     return func.__qualname__
@@ -88,10 +87,7 @@ def _get_method_name(func: Callable[..., Any]) -> str:
 
 def _normalise_names(names: set[str]) -> set[str]:
     """Return names normalised for case-insensitive comparison."""
-    return {
-        name.lower()
-        for name in names
-    }
+    return {name.lower() for name in names}
 
 
 def _validate_max_length(
@@ -100,9 +96,7 @@ def _validate_max_length(
 ) -> None:
     """Validate a maximum length configuration value."""
     if value <= 0:
-        raise ValueError(
-            f"{name} must be greater than zero"
-        )
+        raise ValueError(f"{name} must be greater than zero")
 
 
 def _format_value(
@@ -124,10 +118,7 @@ def _format_value(
     if max_length <= len(suffix):
         return suffix[:max_length]
 
-    return (
-        f"{result[:max_length - len(suffix)]}"
-        f"{suffix}"
-    )
+    return f"{result[:max_length - len(suffix)]}" f"{suffix}"
 
 
 def _get_result_metadata(result: Any) -> str:
@@ -153,9 +144,7 @@ def _format_duration(
     start_time: float,
 ) -> str:
     """Return elapsed time in milliseconds."""
-    duration_ms = (
-        time.perf_counter() - start_time
-    ) * 1_000
+    duration_ms = (time.perf_counter() - start_time) * 1_000
 
     return f"duration_ms={duration_ms:.3f}"
 
@@ -164,9 +153,7 @@ def _format_elapsed(
     start_time: float,
 ) -> str:
     """Return elapsed time since operation start."""
-    elapsed_ms = (
-        time.perf_counter() - start_time
-    ) * 1_000
+    elapsed_ms = (time.perf_counter() - start_time) * 1_000
 
     return f"elapsed_ms={elapsed_ms:.3f}"
 
@@ -207,13 +194,9 @@ def _log_exception(
         parts.append(run_id_text)
 
     if items_yielded is not None:
-        parts.append(
-            f"items_yielded={items_yielded}"
-        )
+        parts.append(f"items_yielded={items_yielded}")
 
-    parts.append(
-        _format_duration(start_time)
-    )
+    parts.append(_format_duration(start_time))
 
     try:
         logger.exception(
@@ -272,15 +255,10 @@ def _log_start(
                         max_arg_length,
                     )
 
-            parts.append(
-                f"parameters={parameters}"
-            )
+            parts.append(f"parameters={parameters}")
 
         except Exception as exc:
-            parts.append(
-                "parameters="
-                f"<unable to format: {type(exc).__name__}>"
-            )
+            parts.append("parameters=" f"<unable to format: {type(exc).__name__}>")
 
     logger.log(
         log_level,
@@ -291,6 +269,7 @@ def _log_start(
 # ---------------------------------------------------------------------------
 # Normal method decorator
 # ---------------------------------------------------------------------------
+
 
 def log_method(
     *,
@@ -355,12 +334,7 @@ def log_method(
 
     # Custom redaction names EXTEND the defaults.
     redact_args_normalised = _normalise_names(
-        _DEFAULT_REDACT_ARGS
-        | (
-            set()
-            if redact_args is None
-            else set(redact_args)
-        )
+        _DEFAULT_REDACT_ARGS | (set() if redact_args is None else set(redact_args))
     )
 
     def apply_logging(
@@ -419,9 +393,7 @@ def log_method(
                     parts.append(run_id_text)
 
                 if log_duration:
-                    parts.append(
-                        _format_duration(start_time)
-                    )
+                    parts.append(_format_duration(start_time))
 
                 logger.log(
                     log_level,
@@ -441,22 +413,16 @@ def log_method(
                 parts.append(run_id_text)
 
             if log_result_metadata:
-                parts.append(
-                    _get_result_metadata(result)
-                )
+                parts.append(_get_result_metadata(result))
 
             if log_result:
-                parts.append(
-                    f"result={_format_value(
+                parts.append(f"result={_format_value(
                         result,
                         max_result_length,
-                    )}"
-                )
+                    )}")
 
             if log_duration:
-                parts.append(
-                    _format_duration(start_time)
-                )
+                parts.append(_format_duration(start_time))
 
             logger.log(
                 log_level,
@@ -473,6 +439,7 @@ def log_method(
 # ---------------------------------------------------------------------------
 # Generator decorator
 # ---------------------------------------------------------------------------
+
 
 def log_generator(
     *,
@@ -561,28 +528,16 @@ def log_generator(
     """
 
     if log_yields_every is not None and log_yields_every <= 0:
-        raise ValueError(
-            "log_yields_every must be greater than zero"
-        )
+        raise ValueError("log_yields_every must be greater than zero")
 
     if log_yield_result and not log_yields:
-        raise ValueError(
-            "log_yield_result requires log_yields=True"
-        )
+        raise ValueError("log_yield_result requires log_yields=True")
 
     if log_final_yield and not log_yields:
-        raise ValueError(
-            "log_final_yield requires log_yields=True"
-        )
+        raise ValueError("log_final_yield requires log_yields=True")
 
-    if (
-        log_yield_interval_duration
-        and not log_yields
-    ):
-        raise ValueError(
-            "log_yield_interval_duration "
-            "requires log_yields=True"
-        )
+    if log_yield_interval_duration and not log_yields:
+        raise ValueError("log_yield_interval_duration " "requires log_yields=True")
 
     _validate_max_length(
         "max_arg_length",
@@ -596,12 +551,7 @@ def log_generator(
 
     # Custom redaction names EXTEND the defaults.
     redact_args_normalised = _normalise_names(
-        _DEFAULT_REDACT_ARGS
-        | (
-            set()
-            if redact_args is None
-            else set(redact_args)
-        )
+        _DEFAULT_REDACT_ARGS | (set() if redact_args is None else set(redact_args))
     )
 
     def apply_logging(
@@ -653,12 +603,8 @@ def log_generator(
                     has_yielded = True
                     last_yielded_result = result
 
-                    should_log_yield = (
-                        log_yields
-                        and (
-                            log_yields_every is None
-                            or count % log_yields_every == 0
-                        )
+                    should_log_yield = log_yields and (
+                        log_yields_every is None or count % log_yields_every == 0
                     )
 
                     if should_log_yield:
@@ -673,37 +619,29 @@ def log_generator(
                         if run_id_text:
                             parts.append(run_id_text)
 
-                        parts.append(
-                            _get_result_metadata(result)
-                        )
+                        parts.append(_get_result_metadata(result))
 
                         if log_yield_result:
-                            parts.append(
-                                f"result={_format_value(
+                            parts.append(f"result={_format_value(
                                     result,
                                     max_yield_length,
-                                )}"
-                            )
+                                )}")
 
                         if log_yield_interval_duration:
 
                             now = time.perf_counter()
 
                             interval_duration_ms = (
-                                now
-                                - previous_logged_yield_time
+                                now - previous_logged_yield_time
                             ) * 1_000
 
                             parts.append(
-                                "interval_duration_ms="
-                                f"{interval_duration_ms:.3f}"
+                                "interval_duration_ms=" f"{interval_duration_ms:.3f}"
                             )
 
                             previous_logged_yield_time = now
 
-                        parts.append(
-                            _format_elapsed(start_time)
-                        )
+                        parts.append(_format_elapsed(start_time))
 
                         logger.log(
                             log_level,
@@ -761,23 +699,15 @@ def log_generator(
                     if run_id_text:
                         parts.append(run_id_text)
 
-                    parts.append(
-                        _get_result_metadata(
-                            last_yielded_result
-                        )
-                    )
+                    parts.append(_get_result_metadata(last_yielded_result))
 
                     if log_yield_result:
-                        parts.append(
-                            f"result={_format_value(
+                        parts.append(f"result={_format_value(
                                 last_yielded_result,
                                 max_yield_length,
-                            )}"
-                        )
+                            )}")
 
-                    parts.append(
-                        _format_elapsed(start_time)
-                    )
+                    parts.append(_format_elapsed(start_time))
 
                     logger.log(
                         log_level,
@@ -799,15 +729,15 @@ def log_generator(
                     parts.append(run_id_text)
 
                 if log_result_metadata:
-                    parts.extend([
-                        "result_type=generator",
-                        f"items_yielded={count}",
-                    ])
+                    parts.extend(
+                        [
+                            "result_type=generator",
+                            f"items_yielded={count}",
+                        ]
+                    )
 
                 if log_duration:
-                    parts.append(
-                        _format_duration(start_time)
-                    )
+                    parts.append(_format_duration(start_time))
 
                 logger.log(
                     log_level,
