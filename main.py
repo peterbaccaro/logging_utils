@@ -81,7 +81,7 @@ class SourceReader:
         log_yield_result=False,
         log_final_yield=True,
         log_yield_interval_duration=True,
-        log_result_metadata=True,
+        log_generator_metadata=True,
         log_exceptions=True,
         log_duration=True,
     )
@@ -120,7 +120,7 @@ class SourceToTargetTransformer:
         log_yields_every=100,
         log_final_yield=True,
         log_yield_interval_duration=True,
-        log_result_metadata=True,
+        log_generator_metadata=True,
         log_exceptions=True,
         log_duration=True,
     )
