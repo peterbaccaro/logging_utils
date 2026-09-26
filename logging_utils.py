@@ -374,6 +374,49 @@ def _log_start(
     )
 
 
+def _log_end(
+    *,
+    logger: logging.Logger,
+    log_level: int,
+    method_name: str,
+    status: str,
+    start_time: float,
+    log_duration: bool,
+    extra_fields: list[str] | None = None,
+) -> None:
+    """Build and log an operation's END event.
+
+    Args:
+        logger: Logger used to record the event.
+        log_level: Level for the END event.
+        method_name: Qualified name of the operation.
+        status: Final operation status.
+        start_time: Operation start time from ``time.perf_counter()``.
+        log_duration: Whether to include total elapsed time.
+        extra_fields: Additional fields to include after the run ID.
+    """
+    parts = [
+        f"END {method_name}",
+        f"status={status}",
+    ]
+
+    run_id_text = _get_run_id_text()
+
+    if run_id_text:
+        parts.append(run_id_text)
+
+    if extra_fields:
+        parts.extend(extra_fields)
+
+    if log_duration:
+        parts.append(_format_duration(start_time))
+
+    logger.log(
+        log_level,
+        " ".join(parts),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Normal method decorator
 # ---------------------------------------------------------------------------
@@ -494,52 +537,36 @@ def log_method(
                     start_time=start_time,
                 )
 
-                # Always emit END for a failed operation.
-                parts = [
-                    f"END {method_name}",
-                    "status=failed",
-                ]
-
-                run_id_text = _get_run_id_text()
-
-                if run_id_text:
-                    parts.append(run_id_text)
-
-                if log_duration:
-                    parts.append(_format_duration(start_time))
-
-                logger.log(
-                    log_level,
-                    " ".join(parts),
+                _log_end(
+                    logger=logger,
+                    log_level=log_level,
+                    method_name=method_name,
+                    status="failed",
+                    start_time=start_time,
+                    log_duration=log_duration,
                 )
 
                 raise
 
-            parts = [
-                f"END {method_name}",
-                "status=completed",
-            ]
-
-            run_id_text = _get_run_id_text()
-
-            if run_id_text:
-                parts.append(run_id_text)
+            extra_fields = []
 
             if log_result_metadata:
-                parts.append(_get_result_metadata(result))
+                extra_fields.append(_get_result_metadata(result))
 
             if log_result:
-                parts.append(f"result={_format_value(
+                extra_fields.append(f"result={_format_value(
                         result,
                         max_result_length,
                     )}")
 
-            if log_duration:
-                parts.append(_format_duration(start_time))
-
-            logger.log(
-                log_level,
-                " ".join(parts),
+            _log_end(
+                logger=logger,
+                log_level=log_level,
+                method_name=method_name,
+                status="completed",
+                start_time=start_time,
+                log_duration=log_duration,
+                extra_fields=extra_fields,
             )
 
             return result
@@ -826,30 +853,24 @@ def log_generator(
                 # END
                 # -----------------------------------------------------------
 
-                parts = [
-                    f"END {method_name}",
-                    f"status={status}",
-                ]
-
-                run_id_text = _get_run_id_text()
-
-                if run_id_text:
-                    parts.append(run_id_text)
+                extra_fields = []
 
                 if log_result_metadata:
-                    parts.extend(
+                    extra_fields.extend(
                         [
                             "result_type=generator",
                             f"items_yielded={count}",
                         ]
                     )
 
-                if log_duration:
-                    parts.append(_format_duration(start_time))
-
-                logger.log(
-                    log_level,
-                    " ".join(parts),
+                _log_end(
+                    logger=logger,
+                    log_level=log_level,
+                    method_name=method_name,
+                    status=status,
+                    start_time=start_time,
+                    log_duration=log_duration,
+                    extra_fields=extra_fields,
                 )
 
         return logged_generator
