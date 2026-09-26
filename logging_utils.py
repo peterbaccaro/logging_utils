@@ -7,6 +7,7 @@ import logging
 import sys
 import time
 from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from typing import Any
 
 # ---------------------------------------------------------------------------
@@ -66,6 +67,26 @@ def get_run_id() -> str | None:
         The current ID, or None if no ID has been set.
     """
     return _run_id.get()
+
+
+@contextmanager
+def run_id_context(run_id: str | None) -> Iterator[None]:
+    """Temporarily set the correlation ID for the current context.
+
+    Args:
+        run_id: ID to use inside the context, or None to clear it temporarily.
+
+    Yields:
+        None.
+
+    The previous ID is restored when the context exits, including when an
+    exception is raised. Contexts can be nested safely.
+    """
+    token = _run_id.set(run_id)
+    try:
+        yield
+    finally:
+        _run_id.reset(token)
 
 
 # ---------------------------------------------------------------------------
