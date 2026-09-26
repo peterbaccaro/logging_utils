@@ -190,17 +190,24 @@ def _get_result_metadata(result: Any) -> str:
     """
     result_type = type(result).__name__
 
-    try:
-        result_length = len(result)
-    except Exception:
-        result_length = None
+    if isinstance(
+        result,
+        (
+            str,
+            bytes,
+            bytearray,
+            list,
+            tuple,
+            dict,
+            set,
+            frozenset,
+            range,
+            memoryview,
+        ),
+    ):
+        return f"type={result_type} length={len(result)}"
 
-    metadata = f"type={result_type}"
-
-    if result_length is not None:
-        metadata += f" length={result_length}"
-
-    return metadata
+    return f"type={result_type}"
 
 
 def _format_duration(
