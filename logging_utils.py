@@ -660,6 +660,9 @@ def log_generator(
     """
     Decorate a generator callable with lifecycle and yield logging.
 
+    Generator execution is lazy: creating the generator emits no events. The
+    START event and duration timing begin when iteration first advances it.
+
     Args:
         log_start:
             Whether to log the START event.
