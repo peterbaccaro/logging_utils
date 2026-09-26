@@ -32,7 +32,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Iterator
 
-from logging_utils import (configure_logging, log_generator, log_method)
+from logging_utils import configure_logging, log_generator, log_method
 
 # ============================================================================
 # Configuration
