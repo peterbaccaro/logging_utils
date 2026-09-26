@@ -219,36 +219,16 @@ def _get_result_metadata(result: Any) -> str:
     return f"type={result_type}"
 
 
-def _format_duration(
-    start_time: float,
-) -> str:
-    """Format total elapsed time in milliseconds.
+def _elapsed_ms(start_time: float) -> float:
+    """Return elapsed time in milliseconds.
 
     Args:
         start_time: Start time from ``time.perf_counter()``.
 
     Returns:
-        Elapsed time as a ``duration_ms`` log field.
+        Elapsed time in milliseconds.
     """
-    duration_ms = (time.perf_counter() - start_time) * 1_000
-
-    return f"duration_ms={duration_ms:.3f}"
-
-
-def _format_elapsed(
-    start_time: float,
-) -> str:
-    """Format elapsed time since operation start.
-
-    Args:
-        start_time: Start time from ``time.perf_counter()``.
-
-    Returns:
-        Elapsed time as an ``elapsed_ms`` log field.
-    """
-    elapsed_ms = (time.perf_counter() - start_time) * 1_000
-
-    return f"elapsed_ms={elapsed_ms:.3f}"
+    return (time.perf_counter() - start_time) * 1_000
 
 
 def _get_run_id_text() -> str:
@@ -328,7 +308,7 @@ def _log_exception(
     if items_yielded is not None:
         parts.append(f"items_yielded={items_yielded}")
 
-    parts.append(_format_duration(start_time))
+    parts.append(f"duration_ms={_elapsed_ms(start_time):.3f}")
 
     _safe_log(
         logger,
@@ -448,7 +428,7 @@ def _log_end(
         parts.extend(extra_fields)
 
     if log_duration:
-        parts.append(_format_duration(start_time))
+        parts.append(f"duration_ms={_elapsed_ms(start_time):.3f}")
 
     _safe_log(
         logger,
@@ -508,7 +488,7 @@ def _log_yield(
     if interval_duration_ms is not None:
         parts.append(f"interval_duration_ms={interval_duration_ms:.3f}")
 
-    parts.append(_format_elapsed(start_time))
+    parts.append(f"elapsed_ms={_elapsed_ms(start_time):.3f}")
 
     _safe_log(
         logger,
