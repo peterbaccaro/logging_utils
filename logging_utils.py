@@ -385,7 +385,7 @@ def log_method(
     log_args: bool = False,
     log_result: bool = False,
     log_result_metadata: bool = False,
-    log_exceptions: bool = False,
+    log_exceptions: bool = True,
     log_duration: bool = False,
     log_level: int = logging.INFO,
     redact_args: set[str] | None = None,
@@ -410,6 +410,7 @@ def log_method(
 
         log_exceptions:
             Whether to log exceptions and their traceback at ERROR level.
+            Enabled by default.
 
         log_duration:
             Whether to log total execution duration.
@@ -563,7 +564,7 @@ def log_generator(
     log_final_yield: bool = False,
     log_yield_interval_duration: bool = False,
     log_result_metadata: bool = False,
-    log_exceptions: bool = False,
+    log_exceptions: bool = True,
     log_duration: bool = False,
     log_level: int = logging.INFO,
     redact_args: set[str] | None = None,
@@ -607,7 +608,7 @@ def log_generator(
 
         log_exceptions:
             Whether to log exceptions and the number of items yielded before
-            failure.
+            failure. Enabled by default.
 
         log_duration:
             Whether to log total generator execution duration.
