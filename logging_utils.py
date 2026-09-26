@@ -1,0 +1,819 @@
+import contextvars
+import functools
+import inspect
+import logging
+import sys
+import time
+from collections.abc import Callable, Iterator
+from typing import Any
+
+
+# ---------------------------------------------------------------------------
+# Logging configuration
+# ---------------------------------------------------------------------------
+
+def configure_logging(level: int = logging.INFO) -> None:
+    """
+    Configure application/root logging.
+
+    Normally called once from main.py or a Databricks notebook/job.
+    """
+    root_logger = logging.getLogger()
+
+    root_logger.setLevel(level)
+
+    if not root_logger.handlers:
+        handler = logging.StreamHandler(sys.stdout)
+
+        handler.setFormatter(
+            logging.Formatter(
+                "%(asctime)s %(levelname)s %(name)s - %(message)s"
+            )
+        )
+
+        root_logger.addHandler(handler)
+
+
+# ---------------------------------------------------------------------------
+# Correlation / run ID
+# ---------------------------------------------------------------------------
+
+_run_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "run_id",
+    default=None,
+)
+
+
+def set_run_id(run_id: str | None) -> None:
+    """
+    Set the run/correlation ID for the current execution context.
+    """
+    _run_id.set(run_id)
+
+
+def get_run_id() -> str | None:
+    """
+    Return the current run/correlation ID.
+    """
+    return _run_id.get()
+
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+_REDACTED = "[REDACTED]"
+
+_DEFAULT_REDACT_ARGS = {
+    "password",
+    "passwd",
+    "secret",
+    "token",
+    "access_token",
+    "refresh_token",
+    "api_key",
+    "apikey",
+    "authorization",
+}
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+def _get_method_name(func: Callable[..., Any]) -> str:
+    """Return the qualified function or method name."""
+    return func.__qualname__
+
+
+def _normalise_names(names: set[str]) -> set[str]:
+    """Return names normalised for case-insensitive comparison."""
+    return {
+        name.lower()
+        for name in names
+    }
+
+
+def _validate_max_length(
+    name: str,
+    value: int,
+) -> None:
+    """Validate a maximum length configuration value."""
+    if value <= 0:
+        raise ValueError(
+            f"{name} must be greater than zero"
+        )
+
+
+def _format_value(
+    value: Any,
+    max_length: int,
+) -> str:
+    """
+    Return a bounded representation of a value.
+
+    The returned string will never exceed max_length characters.
+    """
+    result = repr(value)
+
+    if len(result) <= max_length:
+        return result
+
+    suffix = "... [TRUNCATED]"
+
+    if max_length <= len(suffix):
+        return suffix[:max_length]
+
+    return (
+        f"{result[:max_length - len(suffix)]}"
+        f"{suffix}"
+    )
+
+
+def _get_result_metadata(result: Any) -> str:
+    """
+    Return useful metadata about a result without logging its contents.
+    """
+    result_type = type(result).__name__
+
+    try:
+        result_length = len(result)
+    except Exception:
+        result_length = None
+
+    metadata = f"type={result_type}"
+
+    if result_length is not None:
+        metadata += f" length={result_length}"
+
+    return metadata
+
+
+def _format_duration(
+    start_time: float,
+) -> str:
+    """Return elapsed time in milliseconds."""
+    duration_ms = (
+        time.perf_counter() - start_time
+    ) * 1_000
+
+    return f"duration_ms={duration_ms:.3f}"
+
+
+def _format_elapsed(
+    start_time: float,
+) -> str:
+    """Return elapsed time since operation start."""
+    elapsed_ms = (
+        time.perf_counter() - start_time
+    ) * 1_000
+
+    return f"elapsed_ms={elapsed_ms:.3f}"
+
+
+def _get_run_id_text() -> str:
+    """Return the current run ID as a log field."""
+    run_id = get_run_id()
+
+    if run_id is None:
+        return ""
+
+    return f"run_id={run_id}"
+
+
+def _log_exception(
+    logger: logging.Logger,
+    method_name: str,
+    log_exceptions: bool,
+    start_time: float,
+    items_yielded: int | None = None,
+) -> None:
+    """
+    Log the current exception at ERROR level if enabled.
+
+    Logging errors are deliberately ignored so that an exception
+    from the application is never masked by logging.
+    """
+    if not log_exceptions:
+        return
+
+    parts = [
+        f"EXCEPTION {method_name}",
+    ]
+
+    run_id_text = _get_run_id_text()
+
+    if run_id_text:
+        parts.append(run_id_text)
+
+    if items_yielded is not None:
+        parts.append(
+            f"items_yielded={items_yielded}"
+        )
+
+    parts.append(
+        _format_duration(start_time)
+    )
+
+    try:
+        logger.exception(
+            " ".join(parts),
+            exc_info=True,
+        )
+    except Exception:
+        # Logging must never mask the original exception.
+        pass
+
+
+def _log_start(
+    *,
+    logger: logging.Logger,
+    log_level: int,
+    method_name: str,
+    signature: inspect.Signature,
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+    log_start: bool,
+    log_args: bool,
+    redact_args: set[str],
+    max_arg_length: int,
+) -> None:
+    """Log method start and optionally its arguments."""
+
+    if not log_start:
+        return
+
+    parts = [
+        f"START {method_name}",
+    ]
+
+    run_id_text = _get_run_id_text()
+
+    if run_id_text:
+        parts.append(run_id_text)
+
+    if log_args:
+        try:
+            bound = signature.bind(*args, **kwargs)
+            bound.apply_defaults()
+
+            parameters = {}
+
+            for name, value in bound.arguments.items():
+
+                if name in {"self", "cls"}:
+                    continue
+
+                if name.lower() in redact_args:
+                    parameters[name] = _REDACTED
+                else:
+                    parameters[name] = _format_value(
+                        value,
+                        max_arg_length,
+                    )
+
+            parts.append(
+                f"parameters={parameters}"
+            )
+
+        except Exception as exc:
+            parts.append(
+                "parameters="
+                f"<unable to format: {type(exc).__name__}>"
+            )
+
+    logger.log(
+        log_level,
+        " ".join(parts),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Normal method decorator
+# ---------------------------------------------------------------------------
+
+def log_method(
+    *,
+    log_start: bool = True,
+    log_args: bool = False,
+    log_result: bool = False,
+    log_result_metadata: bool = False,
+    log_exceptions: bool = False,
+    log_duration: bool = False,
+    log_level: int = logging.INFO,
+    redact_args: set[str] | None = None,
+    max_arg_length: int = 2_000,
+    max_result_length: int = 2_000,
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """
+    Log a normal method.
+
+    Parameters:
+        log_start:
+            Log the START event.
+
+        log_args:
+            Log method arguments.
+
+        log_result:
+            Log the actual returned result.
+
+        log_result_metadata:
+            Log metadata about the returned result.
+
+        log_exceptions:
+            Log exceptions including the traceback at ERROR level.
+
+        log_duration:
+            Log total execution duration.
+
+        log_level:
+            Logging level used for normal lifecycle messages.
+
+        redact_args:
+            Additional parameter names whose values should be replaced
+            with [REDACTED]. Matching is case-insensitive.
+
+            These are added to the default sensitive parameter names.
+
+        max_arg_length:
+            Maximum length of each logged argument value.
+
+        max_result_length:
+            Maximum length of the logged result.
+    """
+
+    _validate_max_length(
+        "max_arg_length",
+        max_arg_length,
+    )
+
+    _validate_max_length(
+        "max_result_length",
+        max_result_length,
+    )
+
+    # Custom redaction names EXTEND the defaults.
+    redact_args_normalised = _normalise_names(
+        _DEFAULT_REDACT_ARGS
+        | (
+            set()
+            if redact_args is None
+            else set(redact_args)
+        )
+    )
+
+    def apply_logging(
+        func: Callable[..., Any],
+    ) -> Callable[..., Any]:
+
+        logger = logging.getLogger(func.__module__)
+        signature = inspect.signature(func)
+
+        @functools.wraps(func)
+        def logged_method(
+            *args: Any,
+            **kwargs: Any,
+        ) -> Any:
+
+            method_name = _get_method_name(func)
+            start_time = time.perf_counter()
+
+            _log_start(
+                logger=logger,
+                log_level=log_level,
+                method_name=method_name,
+                signature=signature,
+                args=args,
+                kwargs=kwargs,
+                log_start=log_start,
+                log_args=log_args,
+                redact_args=redact_args_normalised,
+                max_arg_length=max_arg_length,
+            )
+
+            try:
+                result = func(
+                    *args,
+                    **kwargs,
+                )
+
+            except Exception:
+
+                _log_exception(
+                    logger=logger,
+                    method_name=method_name,
+                    log_exceptions=log_exceptions,
+                    start_time=start_time,
+                )
+
+                # Always emit END for a failed operation.
+                parts = [
+                    f"END {method_name}",
+                    "status=failed",
+                ]
+
+                run_id_text = _get_run_id_text()
+
+                if run_id_text:
+                    parts.append(run_id_text)
+
+                if log_duration:
+                    parts.append(
+                        _format_duration(start_time)
+                    )
+
+                logger.log(
+                    log_level,
+                    " ".join(parts),
+                )
+
+                raise
+
+            parts = [
+                f"END {method_name}",
+                "status=completed",
+            ]
+
+            run_id_text = _get_run_id_text()
+
+            if run_id_text:
+                parts.append(run_id_text)
+
+            if log_result_metadata:
+                parts.append(
+                    _get_result_metadata(result)
+                )
+
+            if log_result:
+                parts.append(
+                    f"result={_format_value(
+                        result,
+                        max_result_length,
+                    )}"
+                )
+
+            if log_duration:
+                parts.append(
+                    _format_duration(start_time)
+                )
+
+            logger.log(
+                log_level,
+                " ".join(parts),
+            )
+
+            return result
+
+        return logged_method
+
+    return apply_logging
+
+
+# ---------------------------------------------------------------------------
+# Generator decorator
+# ---------------------------------------------------------------------------
+
+def log_generator(
+    *,
+    log_start: bool = True,
+    log_args: bool = False,
+    log_yields: bool = False,
+    log_yields_every: int | None = None,
+    log_yield_result: bool = False,
+    log_final_yield: bool = False,
+    log_yield_interval_duration: bool = False,
+    log_result_metadata: bool = False,
+    log_exceptions: bool = False,
+    log_duration: bool = False,
+    log_level: int = logging.INFO,
+    redact_args: set[str] | None = None,
+    max_arg_length: int = 2_000,
+    max_yield_length: int = 2_000,
+) -> Callable[
+    [Callable[..., Iterator[Any]]],
+    Callable[..., Iterator[Any]],
+]:
+    """
+    Log a generator method.
+
+    Parameters:
+        log_start:
+            Log the START event.
+
+        log_args:
+            Log generator arguments.
+
+        log_yields:
+            Enable logging of individual yields.
+
+        log_yields_every:
+            Log every Nth yielded item.
+
+            Example:
+                log_yields=True
+                log_yields_every=100
+
+            logs items 100, 200, 300, etc.
+
+        log_yield_result:
+            Include the bounded representation of each
+            logged yielded value.
+
+        log_final_yield:
+            Log the final yielded item after successful
+            generator completion if it was not already
+            logged by log_yields_every.
+
+        log_yield_interval_duration:
+            Log the time since the previous logged yield.
+
+            When log_yields_every is used, this measures
+            the time between logged checkpoints.
+
+        log_result_metadata:
+            Log generator metadata at END, including the
+            number of items yielded.
+
+        log_exceptions:
+            Log exceptions including the number of items
+            yielded before the exception.
+
+        log_duration:
+            Log total generator execution duration.
+
+        log_level:
+            Logging level used for normal lifecycle messages.
+
+        redact_args:
+            Additional parameter names whose values should
+            be replaced with [REDACTED]. Matching is
+            case-insensitive.
+
+            These are added to the default sensitive
+            parameter names.
+
+        max_arg_length:
+            Maximum length of each logged argument value.
+
+        max_yield_length:
+            Maximum length of each logged yield value.
+    """
+
+    if log_yields_every is not None and log_yields_every <= 0:
+        raise ValueError(
+            "log_yields_every must be greater than zero"
+        )
+
+    if log_yield_result and not log_yields:
+        raise ValueError(
+            "log_yield_result requires log_yields=True"
+        )
+
+    if log_final_yield and not log_yields:
+        raise ValueError(
+            "log_final_yield requires log_yields=True"
+        )
+
+    if (
+        log_yield_interval_duration
+        and not log_yields
+    ):
+        raise ValueError(
+            "log_yield_interval_duration "
+            "requires log_yields=True"
+        )
+
+    _validate_max_length(
+        "max_arg_length",
+        max_arg_length,
+    )
+
+    _validate_max_length(
+        "max_yield_length",
+        max_yield_length,
+    )
+
+    # Custom redaction names EXTEND the defaults.
+    redact_args_normalised = _normalise_names(
+        _DEFAULT_REDACT_ARGS
+        | (
+            set()
+            if redact_args is None
+            else set(redact_args)
+        )
+    )
+
+    def apply_logging(
+        func: Callable[..., Iterator[Any]],
+    ) -> Callable[..., Iterator[Any]]:
+
+        logger = logging.getLogger(func.__module__)
+        signature = inspect.signature(func)
+
+        @functools.wraps(func)
+        def logged_generator(
+            *args: Any,
+            **kwargs: Any,
+        ) -> Iterator[Any]:
+
+            method_name = _get_method_name(func)
+            start_time = time.perf_counter()
+
+            previous_logged_yield_time = start_time
+
+            _log_start(
+                logger=logger,
+                log_level=log_level,
+                method_name=method_name,
+                signature=signature,
+                args=args,
+                kwargs=kwargs,
+                log_start=log_start,
+                log_args=log_args,
+                redact_args=redact_args_normalised,
+                max_arg_length=max_arg_length,
+            )
+
+            count = 0
+            last_yielded_result: Any = None
+            has_yielded = False
+            last_logged_yield_count = 0
+
+            status = "completed"
+
+            try:
+
+                for result in func(
+                    *args,
+                    **kwargs,
+                ):
+
+                    count += 1
+                    has_yielded = True
+                    last_yielded_result = result
+
+                    should_log_yield = (
+                        log_yields
+                        and (
+                            log_yields_every is None
+                            or count % log_yields_every == 0
+                        )
+                    )
+
+                    if should_log_yield:
+
+                        parts = [
+                            f"YIELD {method_name}",
+                            f"item={count}",
+                        ]
+
+                        run_id_text = _get_run_id_text()
+
+                        if run_id_text:
+                            parts.append(run_id_text)
+
+                        parts.append(
+                            _get_result_metadata(result)
+                        )
+
+                        if log_yield_result:
+                            parts.append(
+                                f"result={_format_value(
+                                    result,
+                                    max_yield_length,
+                                )}"
+                            )
+
+                        if log_yield_interval_duration:
+
+                            now = time.perf_counter()
+
+                            interval_duration_ms = (
+                                now
+                                - previous_logged_yield_time
+                            ) * 1_000
+
+                            parts.append(
+                                "interval_duration_ms="
+                                f"{interval_duration_ms:.3f}"
+                            )
+
+                            previous_logged_yield_time = now
+
+                        parts.append(
+                            _format_elapsed(start_time)
+                        )
+
+                        logger.log(
+                            log_level,
+                            " ".join(parts),
+                        )
+
+                        last_logged_yield_count = count
+
+                    yield result
+
+            except GeneratorExit:
+
+                status = "closed"
+
+                raise
+
+            except Exception:
+
+                status = "failed"
+
+                _log_exception(
+                    logger=logger,
+                    method_name=method_name,
+                    log_exceptions=log_exceptions,
+                    start_time=start_time,
+                    items_yielded=count,
+                )
+
+                raise
+
+            finally:
+
+                # -----------------------------------------------------------
+                # Optionally log the final yielded item
+                #
+                # Only valid when the generator completed normally.
+                # -----------------------------------------------------------
+
+                if (
+                    status == "completed"
+                    and log_final_yield
+                    and log_yields
+                    and has_yielded
+                    and count != last_logged_yield_count
+                ):
+
+                    parts = [
+                        f"YIELD {method_name}",
+                        f"item={count}",
+                        "final=true",
+                    ]
+
+                    run_id_text = _get_run_id_text()
+
+                    if run_id_text:
+                        parts.append(run_id_text)
+
+                    parts.append(
+                        _get_result_metadata(
+                            last_yielded_result
+                        )
+                    )
+
+                    if log_yield_result:
+                        parts.append(
+                            f"result={_format_value(
+                                last_yielded_result,
+                                max_yield_length,
+                            )}"
+                        )
+
+                    parts.append(
+                        _format_elapsed(start_time)
+                    )
+
+                    logger.log(
+                        log_level,
+                        " ".join(parts),
+                    )
+
+                # -----------------------------------------------------------
+                # END
+                # -----------------------------------------------------------
+
+                parts = [
+                    f"END {method_name}",
+                    f"status={status}",
+                ]
+
+                run_id_text = _get_run_id_text()
+
+                if run_id_text:
+                    parts.append(run_id_text)
+
+                if log_result_metadata:
+                    parts.extend([
+                        "result_type=generator",
+                        f"items_yielded={count}",
+                    ])
+
+                if log_duration:
+                    parts.append(
+                        _format_duration(start_time)
+                    )
+
+                logger.log(
+                    log_level,
+                    " ".join(parts),
+                )
+
+        return logged_generator
+
+    return apply_logging
