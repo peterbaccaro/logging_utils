@@ -1,3 +1,5 @@
+"""Utilities for logging application and generator lifecycle events."""
+
 import contextvars
 import functools
 import inspect
@@ -14,9 +16,13 @@ from typing import Any
 
 def configure_logging(level: int = logging.INFO) -> None:
     """
-    Configure application/root logging.
+    Configure the root logger for application output.
 
-    Normally called once from main.py or a Databricks notebook/job.
+    Args:
+        level: Logging level to apply to the root logger.
+
+    Adds a stream handler only when the root logger has no handlers. Normally
+    called once from an application entry point or notebook/job.
     """
     root_logger = logging.getLogger()
 
@@ -44,14 +50,20 @@ _run_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 
 def set_run_id(run_id: str | None) -> None:
     """
-    Set the run/correlation ID for the current execution context.
+    Set the correlation ID for the current execution context.
+
+    Args:
+        run_id: ID to include in subsequent log messages, or None to clear it.
     """
     _run_id.set(run_id)
 
 
 def get_run_id() -> str | None:
     """
-    Return the current run/correlation ID.
+    Return the correlation ID for the current execution context.
+
+    Returns:
+        The current ID, or None if no ID has been set.
     """
     return _run_id.get()
 
@@ -81,12 +93,26 @@ _DEFAULT_REDACT_ARGS = {
 
 
 def _get_method_name(func: Callable[..., Any]) -> str:
-    """Return the qualified function or method name."""
+    """Return a callable's qualified name.
+
+    Args:
+        func: Callable whose qualified name is retrieved.
+
+    Returns:
+        The callable's qualified name.
+    """
     return func.__qualname__
 
 
 def _normalise_names(names: set[str]) -> set[str]:
-    """Return names normalised for case-insensitive comparison."""
+    """Normalize names for case-insensitive comparison.
+
+    Args:
+        names: Names to normalize.
+
+    Returns:
+        A set containing the lowercase names.
+    """
     return {name.lower() for name in names}
 
 
@@ -94,7 +120,15 @@ def _validate_max_length(
     name: str,
     value: int,
 ) -> None:
-    """Validate a maximum length configuration value."""
+    """Validate a maximum length configuration value.
+
+    Args:
+        name: Configuration option name used in the error message.
+        value: Maximum length to validate.
+
+    Raises:
+        ValueError: If value is not greater than zero.
+    """
     if value <= 0:
         raise ValueError(f"{name} must be greater than zero")
 
@@ -106,7 +140,12 @@ def _format_value(
     """
     Return a bounded representation of a value.
 
-    The returned string will never exceed max_length characters.
+    Args:
+        value: Object to represent.
+        max_length: Maximum number of characters in the returned string.
+
+    Returns:
+        The object's representation, truncated to at most max_length characters.
     """
     result = repr(value)
 
@@ -124,6 +163,12 @@ def _format_value(
 def _get_result_metadata(result: Any) -> str:
     """
     Return useful metadata about a result without logging its contents.
+
+    Args:
+        result: Object whose type and length are inspected.
+
+    Returns:
+        A string containing the object's type and, when available, its length.
     """
     result_type = type(result).__name__
 
@@ -143,7 +188,14 @@ def _get_result_metadata(result: Any) -> str:
 def _format_duration(
     start_time: float,
 ) -> str:
-    """Return elapsed time in milliseconds."""
+    """Format total elapsed time in milliseconds.
+
+    Args:
+        start_time: Start time from ``time.perf_counter()``.
+
+    Returns:
+        Elapsed time as a ``duration_ms`` log field.
+    """
     duration_ms = (time.perf_counter() - start_time) * 1_000
 
     return f"duration_ms={duration_ms:.3f}"
@@ -152,14 +204,25 @@ def _format_duration(
 def _format_elapsed(
     start_time: float,
 ) -> str:
-    """Return elapsed time since operation start."""
+    """Format elapsed time since operation start.
+
+    Args:
+        start_time: Start time from ``time.perf_counter()``.
+
+    Returns:
+        Elapsed time as an ``elapsed_ms`` log field.
+    """
     elapsed_ms = (time.perf_counter() - start_time) * 1_000
 
     return f"elapsed_ms={elapsed_ms:.3f}"
 
 
 def _get_run_id_text() -> str:
-    """Return the current run ID as a log field."""
+    """Return the current correlation ID as a log field.
+
+    Returns:
+        The ID as a ``run_id`` field, or an empty string when unset.
+    """
     run_id = get_run_id()
 
     if run_id is None:
@@ -176,10 +239,17 @@ def _log_exception(
     items_yielded: int | None = None,
 ) -> None:
     """
-    Log the current exception at ERROR level if enabled.
+    Log the current exception at ERROR level when enabled.
 
-    Logging errors are deliberately ignored so that an exception
-    from the application is never masked by logging.
+    Args:
+        logger: Logger used to record the exception.
+        method_name: Qualified name of the operation that failed.
+        log_exceptions: Whether to emit the exception log.
+        start_time: Operation start time from ``time.perf_counter()``.
+        items_yielded: Number of items yielded before failure, if applicable.
+
+    Logging errors are deliberately ignored so they never mask the application
+    exception.
     """
     if not log_exceptions:
         return
@@ -221,7 +291,20 @@ def _log_start(
     redact_args: set[str],
     max_arg_length: int,
 ) -> None:
-    """Log method start and optionally its arguments."""
+    """Log an operation's start event and optionally its arguments.
+
+    Args:
+        logger: Logger used to record the event.
+        log_level: Level for the start event.
+        method_name: Qualified name of the operation.
+        signature: Callable signature used to bind arguments.
+        args: Positional arguments passed to the operation.
+        kwargs: Keyword arguments passed to the operation.
+        log_start: Whether to emit a start event.
+        log_args: Whether to include argument values.
+        redact_args: Lowercase parameter names whose values must be redacted.
+        max_arg_length: Maximum length for each formatted argument value.
+    """
 
     if not log_start:
         return
@@ -285,41 +368,45 @@ def log_method(
     max_result_length: int = 2_000,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """
-    Log a normal method.
+    Decorate a regular callable with lifecycle logging.
 
-    Parameters:
+    Args:
         log_start:
-            Log the START event.
+            Whether to log the START event.
 
         log_args:
-            Log method arguments.
+            Whether to log method arguments, with sensitive names redacted.
 
         log_result:
-            Log the actual returned result.
+            Whether to log the bounded representation of the returned value.
 
         log_result_metadata:
-            Log metadata about the returned result.
+            Whether to log the returned value's type and, when available, length.
 
         log_exceptions:
-            Log exceptions including the traceback at ERROR level.
+            Whether to log exceptions and their traceback at ERROR level.
 
         log_duration:
-            Log total execution duration.
+            Whether to log total execution duration.
 
         log_level:
-            Logging level used for normal lifecycle messages.
+            Logging level for normal lifecycle messages.
 
         redact_args:
-            Additional parameter names whose values should be replaced
-            with [REDACTED]. Matching is case-insensitive.
-
-            These are added to the default sensitive parameter names.
+            Additional parameter names to redact, matched case-insensitively
+            and added to the default sensitive names.
 
         max_arg_length:
-            Maximum length of each logged argument value.
+            Maximum length of each logged argument representation.
 
         max_result_length:
-            Maximum length of the logged result.
+            Maximum length of the logged result representation.
+
+    Returns:
+        A decorator that wraps a callable with the configured logging.
+
+    Raises:
+        ValueError: If either maximum length is not greater than zero.
     """
 
     _validate_max_length(
@@ -462,69 +549,64 @@ def log_generator(
     Callable[..., Iterator[Any]],
 ]:
     """
-    Log a generator method.
+    Decorate a generator callable with lifecycle and yield logging.
 
-    Parameters:
+    Args:
         log_start:
-            Log the START event.
+            Whether to log the START event.
 
         log_args:
-            Log generator arguments.
+            Whether to log generator arguments, with sensitive names redacted.
 
         log_yields:
-            Enable logging of individual yields.
+            Whether to enable logging of individual yielded items.
 
         log_yields_every:
-            Log every Nth yielded item.
-
-            Example:
-                log_yields=True
-                log_yields_every=100
-
-            logs items 100, 200, 300, etc.
+            Log every Nth item when yield logging is enabled. For example, 100
+            logs items 100, 200, 300, and so on. None logs each item.
 
         log_yield_result:
-            Include the bounded representation of each
-            logged yielded value.
+            Whether to include the bounded representation of each logged item.
 
         log_final_yield:
-            Log the final yielded item after successful
-            generator completion if it was not already
-            logged by log_yields_every.
+            Whether to log the final item after successful completion if it was
+            not already logged by the interval.
 
         log_yield_interval_duration:
-            Log the time since the previous logged yield.
-
-            When log_yields_every is used, this measures
-            the time between logged checkpoints.
+            Whether to log time since the previous logged item. With
+            log_yields_every, this measures time between logged checkpoints.
 
         log_result_metadata:
-            Log generator metadata at END, including the
-            number of items yielded.
+            Whether to log generator metadata and the number of items yielded
+            at the END event.
 
         log_exceptions:
-            Log exceptions including the number of items
-            yielded before the exception.
+            Whether to log exceptions and the number of items yielded before
+            failure.
 
         log_duration:
-            Log total generator execution duration.
+            Whether to log total generator execution duration.
 
         log_level:
-            Logging level used for normal lifecycle messages.
+            Logging level for normal lifecycle messages.
 
         redact_args:
-            Additional parameter names whose values should
-            be replaced with [REDACTED]. Matching is
-            case-insensitive.
-
-            These are added to the default sensitive
-            parameter names.
+            Additional parameter names to redact, matched case-insensitively
+            and added to the default sensitive names.
 
         max_arg_length:
-            Maximum length of each logged argument value.
+            Maximum length of each logged argument representation.
 
         max_yield_length:
-            Maximum length of each logged yield value.
+            Maximum length of each logged yielded-value representation.
+
+    Returns:
+        A decorator that wraps a generator with the configured logging.
+
+    Raises:
+        ValueError: If a maximum length is not greater than zero, the yield
+            interval is not greater than zero, or a yield logging option is
+            enabled while ``log_yields`` is false.
     """
 
     if log_yields_every is not None and log_yields_every <= 0:
