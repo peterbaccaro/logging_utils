@@ -188,11 +188,15 @@ def _get_result_metadata(result: Any) -> str:
     Returns:
         A string containing the object's type and, when available, its length.
     """
-    result_type = type(result).__name__
+    result_class = type(result)
+    try:
+        result_type = result_class.__name__
+    except Exception:
+        result_type = "unknown"
 
-    if isinstance(
-        result,
-        (
+    if any(
+        result_class is supported_type
+        for supported_type in (
             str,
             bytes,
             bytearray,
@@ -203,9 +207,14 @@ def _get_result_metadata(result: Any) -> str:
             frozenset,
             range,
             memoryview,
-        ),
+        )
     ):
-        return f"type={result_type} length={len(result)}"
+        try:
+            result_length = len(result)
+        except Exception:
+            pass
+        else:
+            return f"type={result_type} length={result_length}"
 
     return f"type={result_type}"
 
@@ -253,7 +262,35 @@ def _get_run_id_text() -> str:
     if run_id is None:
         return ""
 
-    return f"run_id={run_id}"
+    try:
+        return f"run_id={run_id}"
+    except Exception:
+        return "run_id=<unavailable>"
+
+
+def _is_enabled_for(logger: logging.Logger, level: int) -> bool:
+    """Return whether a logger accepts a level, treating logger failures as disabled."""
+    try:
+        return logger.isEnabledFor(level)
+    except Exception:
+        return False
+
+
+def _safe_log(
+    logger: logging.Logger,
+    level: int,
+    message: str,
+    *,
+    exc_info: bool = False,
+) -> None:
+    """Emit a log message without allowing logging failures to escape."""
+    try:
+        if exc_info:
+            logger.log(level, message, exc_info=True)
+        else:
+            logger.log(level, message)
+    except Exception:
+        pass
 
 
 def _log_exception(
@@ -276,7 +313,7 @@ def _log_exception(
     Logging errors are deliberately ignored so they never mask the application
     exception.
     """
-    if not log_exceptions or not logger.isEnabledFor(logging.ERROR):
+    if not log_exceptions or not _is_enabled_for(logger, logging.ERROR):
         return
 
     parts = [
@@ -293,14 +330,12 @@ def _log_exception(
 
     parts.append(_format_duration(start_time))
 
-    try:
-        logger.exception(
-            " ".join(parts),
-            exc_info=True,
-        )
-    except Exception:
-        # Logging must never mask the original exception.
-        pass
+    _safe_log(
+        logger,
+        logging.ERROR,
+        " ".join(parts),
+        exc_info=True,
+    )
 
 
 def _log_start(
@@ -331,7 +366,7 @@ def _log_start(
         max_arg_length: Maximum length for each formatted argument value.
     """
 
-    if not log_start or not logger.isEnabledFor(log_level):
+    if not log_start or not _is_enabled_for(logger, log_level):
         return
 
     parts = [
@@ -368,7 +403,8 @@ def _log_start(
         except Exception as exc:
             parts.append("parameters=" f"<unable to format: {type(exc).__name__}>")
 
-    logger.log(
+    _safe_log(
+        logger,
         log_level,
         " ".join(parts),
     )
@@ -395,7 +431,7 @@ def _log_end(
         log_duration: Whether to include total elapsed time.
         extra_fields: Additional fields to include after the run ID.
     """
-    if not logger.isEnabledFor(log_level):
+    if not _is_enabled_for(logger, log_level):
         return
 
     parts = [
@@ -414,7 +450,8 @@ def _log_end(
     if log_duration:
         parts.append(_format_duration(start_time))
 
-    logger.log(
+    _safe_log(
+        logger,
         log_level,
         " ".join(parts),
     )
@@ -447,7 +484,7 @@ def _log_yield(
         interval_duration_ms: Time since the previous logged yield, if enabled.
         final: Whether this is the final yield event.
     """
-    if not logger.isEnabledFor(log_level):
+    if not _is_enabled_for(logger, log_level):
         return
 
     parts = [
@@ -473,7 +510,8 @@ def _log_yield(
 
     parts.append(_format_elapsed(start_time))
 
-    logger.log(
+    _safe_log(
+        logger,
         log_level,
         " ".join(parts),
     )
@@ -612,7 +650,7 @@ def log_method(
 
             extra_fields = []
 
-            if logger.isEnabledFor(log_level):
+            if _is_enabled_for(logger, log_level):
                 if log_result_metadata:
                     extra_fields.append(_get_result_metadata(result))
 
@@ -816,7 +854,7 @@ def log_generator(
                         log_yields_every is None or count % log_yields_every == 0
                     )
 
-                    if should_log_yield and logger.isEnabledFor(log_level):
+                    if should_log_yield and _is_enabled_for(logger, log_level):
 
                         interval_duration_ms = None
                         if log_yield_interval_duration:
@@ -876,7 +914,7 @@ def log_generator(
                     and log_yields
                     and has_yielded
                     and count != last_logged_yield_count
-                    and logger.isEnabledFor(log_level)
+                    and _is_enabled_for(logger, log_level)
                 ):
 
                     _log_yield(
@@ -897,7 +935,7 @@ def log_generator(
 
                 extra_fields = []
 
-                if log_generator_metadata and logger.isEnabledFor(log_level):
+                if log_generator_metadata and _is_enabled_for(logger, log_level):
                     extra_fields.append(f"items_yielded={count}")
                     if yielded_type is not None:
                         yielded_type_name = (
