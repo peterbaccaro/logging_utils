@@ -132,13 +132,13 @@ def test_is_enabled_for_contains_logger_errors() -> None:
 
 
 def test_safe_log_contains_logger_errors() -> None:
-    class BadLogger(logging.Logger):
+    class BadLogger:
         def log(
             self, level: int, message: object, *args: object, **kwargs: object
         ) -> None:
             raise RuntimeError("handler failed")
 
-    logger = BadLogger("bad-log")
+    logger = BadLogger()
     _safe_log(cast(logging.Logger, logger), logging.INFO, "message")
     _safe_log(
         cast(logging.Logger, logger),
@@ -341,7 +341,7 @@ def test_log_generator_rejects_invalid_options(kwargs: dict[str, Any]) -> None:
 def test_logging_failures_do_not_change_wrapped_behavior(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    class BadLogger(logging.Logger):
+    class BadLogger:
         def isEnabledFor(self, level: int) -> bool:
             return True
 
@@ -351,7 +351,7 @@ def test_logging_failures_do_not_change_wrapped_behavior(
             raise RuntimeError("logging failure")
 
     original_get_logger = logging_utils.logging.getLogger
-    broken_logger = BadLogger("broken")
+    broken_logger = BadLogger()
 
     def get_logger(*args: Any) -> logging.Logger:
         if args:
