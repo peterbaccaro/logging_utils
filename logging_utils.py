@@ -8,7 +8,11 @@ import sys
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from typing import Any
+from typing import Any, ParamSpec, TypeVar
+
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+_YieldT = TypeVar("_YieldT")
 
 # ---------------------------------------------------------------------------
 # Logging configuration
@@ -387,7 +391,7 @@ def log_method(
     redact_args: set[str] | None = None,
     max_arg_length: int = 2_000,
     max_result_length: int = 2_000,
-) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
     """
     Decorate a regular callable with lifecycle logging.
 
@@ -446,17 +450,17 @@ def log_method(
     )
 
     def apply_logging(
-        func: Callable[..., Any],
-    ) -> Callable[..., Any]:
+        func: Callable[_P, _R],
+    ) -> Callable[_P, _R]:
 
         logger = logging.getLogger(func.__module__)
         signature = inspect.signature(func)
 
         @functools.wraps(func)
         def logged_method(
-            *args: Any,
-            **kwargs: Any,
-        ) -> Any:
+            *args: _P.args,
+            **kwargs: _P.kwargs,
+        ) -> _R:
 
             method_name = _get_method_name(func)
             start_time = time.perf_counter()
@@ -566,8 +570,8 @@ def log_generator(
     max_arg_length: int = 2_000,
     max_yield_length: int = 2_000,
 ) -> Callable[
-    [Callable[..., Iterator[Any]]],
-    Callable[..., Iterator[Any]],
+    [Callable[_P, Iterator[_YieldT]]],
+    Callable[_P, Iterator[_YieldT]],
 ]:
     """
     Decorate a generator callable with lifecycle and yield logging.
@@ -658,17 +662,17 @@ def log_generator(
     )
 
     def apply_logging(
-        func: Callable[..., Iterator[Any]],
-    ) -> Callable[..., Iterator[Any]]:
+        func: Callable[_P, Iterator[_YieldT]],
+    ) -> Callable[_P, Iterator[_YieldT]]:
 
         logger = logging.getLogger(func.__module__)
         signature = inspect.signature(func)
 
         @functools.wraps(func)
         def logged_generator(
-            *args: Any,
-            **kwargs: Any,
-        ) -> Iterator[Any]:
+            *args: _P.args,
+            **kwargs: _P.kwargs,
+        ) -> Iterator[_YieldT]:
 
             method_name = _get_method_name(func)
             start_time = time.perf_counter()
