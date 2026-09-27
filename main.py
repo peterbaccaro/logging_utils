@@ -32,7 +32,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Iterator
 
-from logging_utils import configure_logging, log_generator, log_method
+from logging_utils_simple import configure_logging, log_generator, log_method
 
 # ============================================================================
 # Configuration
@@ -75,10 +75,8 @@ class SourceReader:
         self.batch_size = batch_size
 
     @log_generator(
-        log_args=True,
         log_yields=True,
         log_yields_every=100,
-        log_yield_result=False,
         log_final_yield=True,
         log_yield_interval_duration=True,
         log_generator_metadata=True,
@@ -161,7 +159,6 @@ class TargetWriter:
         self.batch_size = batch_size
 
     @log_method(
-        log_args=False,
         log_result_metadata=True,
         log_exceptions=True,
         log_duration=True,
@@ -213,7 +210,6 @@ class TargetWriter:
         }
 
     @log_method(
-        log_args=False,
         log_result_metadata=True,
         log_exceptions=True,
         log_duration=True,
@@ -259,7 +255,6 @@ class EtlOrchestrator:
 
     @log_method(
         log_start=True,
-        log_args=False,
         log_result_metadata=True,
         log_exceptions=True,
         log_duration=True,
@@ -295,11 +290,9 @@ class EtlFactory:
 
     @staticmethod
     @log_method(
-        log_args=True,
         log_result_metadata=True,
         log_exceptions=True,
         log_duration=True,
-        redact_args={"password", "token", "secret"},
     )
     def create(
         config: EtlConfig,
