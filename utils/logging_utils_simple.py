@@ -132,10 +132,9 @@ def _get_result_metadata(result: Any) -> str:
     ):
         try:
             result_length = len(result)
+            return f"type={result_type} length={result_length}"
         except Exception:
             pass
-        else:
-            return f"type={result_type} length={result_length}"
 
     return f"type={result_type}"
 
@@ -233,7 +232,7 @@ def _log_exception(
 
     _safe_log(
         logger,
-        logging.ERROR,
+        logging.EXCEPTION,
         " ".join(parts),
         exc_info=True,
     )
@@ -383,7 +382,7 @@ def log_method(
     *,
     log_start: bool = True,
     log_result_metadata: bool = False,
-    log_exceptions: bool = True,
+    log_exceptions: bool = False,
     log_duration: bool = False,
     log_level: int = logging.INFO,
 ) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
@@ -399,7 +398,6 @@ def log_method(
 
         log_exceptions:
             Whether to log exceptions and their traceback at ERROR level.
-            Enabled by default.
 
         log_duration:
             Whether to log total execution duration.
@@ -495,7 +493,7 @@ def log_generator(
     log_final_yield: bool = False,
     log_yield_interval_duration: bool = False,
     log_generator_metadata: bool = False,
-    log_exceptions: bool = True,
+    log_exceptions: bool = False,
     log_duration: bool = False,
     log_level: int = logging.INFO,
 ) -> Callable[
@@ -528,12 +526,12 @@ def log_generator(
             log_yields_every, this measures time between logged checkpoints.
 
         log_generator_metadata:
-            Whether to log ``items_yielded`` and, when available,
-            ``yielded_type`` at the END event.
+            Whether to log `items_yielded` and, when available,
+            `yielded_type` at the END event.
 
         log_exceptions:
             Whether to log exceptions and the number of items yielded before
-            failure. Enabled by default.
+            failure.
 
         log_duration:
             Whether to log total generator execution duration.
@@ -546,7 +544,7 @@ def log_generator(
 
     Raises:
         ValueError: If the yield interval is not greater than zero, or an option
-            requiring yield logging is enabled while ``log_yields`` is false.
+            requiring yield logging is enabled while `log_yields` is false.
     """
 
     if log_yields_every is not None and log_yields_every <= 0:
