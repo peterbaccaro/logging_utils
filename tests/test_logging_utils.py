@@ -5,8 +5,8 @@ from unittest.mock import patch
 
 import pytest
 
-import logging_utils
-from logging_utils import (
+import utils.logging_utils as logging_utils
+from utils.logging_utils import (
     _elapsed_ms,
     _format_value,
     _get_result_metadata,
@@ -32,7 +32,7 @@ from logging_utils import (
     ],
 )
 def test_elapsed_ms(start_time: float, current_time: float, expected_ms: float) -> None:
-    with patch("logging_utils.time.perf_counter", return_value=current_time):
+    with patch("utils.logging_utils.time.perf_counter", return_value=current_time):
         assert _elapsed_ms(start_time) == pytest.approx(expected_ms)
 
 
