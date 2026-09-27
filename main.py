@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from etl.example_databricks_task_factory import ExampleDatabricksTaskFactory
 from etl.types.etl_config import EtlConfig
-from etl.etl_factory import EtlFactory
 from utils.logging_utils_simple import configure_logging
 
 
@@ -27,10 +27,7 @@ def main() -> None:
     # Generate one correlation/run ID for the complete ETL execution.
     # run_id = str(uuid.uuid4())
 
-    # set_run_id(run_id)
-    # set_run_id("")
-
-    orchestrator = EtlFactory.create(config)
+    orchestrator = ExampleDatabricksTaskFactory.create(config)
 
     result = orchestrator.run()
 
