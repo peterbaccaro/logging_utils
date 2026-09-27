@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from etl.example_databricks_task_factory import ExampleDatabricksTaskFactory
 from etl.types.etl_config import EtlConfig
-from utils.logging_utils_simple import configure_logging
+from utils.logging_utils_simple import configure_logging, run_context
 
 
 def main() -> None:
@@ -12,11 +12,6 @@ def main() -> None:
 
     configure_logging()
 
-    # In a real Databricks implementation this could come from:
-    #   - job parameters
-    #   - widgets
-    #   - environment configuration
-    #   - ETL control tables
     config = EtlConfig(
         environment="dev",
         source_name="source_api",
@@ -24,14 +19,11 @@ def main() -> None:
         batch_size=100,
     )
 
-    # Generate one correlation/run ID for the complete ETL execution.
-    # run_id = str(uuid.uuid4())
+    with run_context() as context:
+        task = ExampleDatabricksTaskFactory.create(config)
+        task_result = task.run()
 
-    orchestrator = ExampleDatabricksTaskFactory.create(config)
-
-    result = orchestrator.run()
-
-    print(f"ETL completed: {result}")
+    print(f"ETL completed: {task_result}")
 
 
 if __name__ == "__main__":

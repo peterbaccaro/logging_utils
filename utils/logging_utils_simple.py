@@ -5,6 +5,7 @@ import functools
 import logging
 import sys
 import time
+import uuid
 from collections.abc import Callable, Generator, Iterator, Sized
 from contextlib import contextmanager
 from typing import Any, ParamSpec, TypeVar
@@ -61,7 +62,7 @@ def get_run_id() -> str | None:
 
 
 @contextmanager
-def run_context(run_id: str | None) -> Generator[None, None, None]:
+def run_context(run_id: str | None = None) -> Generator[None, None, None]:
     """Temporarily set the correlation ID for the current context.
 
     Args:
@@ -73,6 +74,8 @@ def run_context(run_id: str | None) -> Generator[None, None, None]:
     The previous ID is restored when the context exits, including when an
     exception is raised. Contexts can be nested safely.
     """
+    if not run_id:
+        run_id = str(uuid.uuid4()).split("-")[-1]
     token = _run_id.set(run_id)
     try:
         yield
