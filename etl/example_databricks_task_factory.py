@@ -1,17 +1,16 @@
 from typing import Any, Iterator
 
-from etl.components.source_reader import SourceReader
+from etl.components.acme_api_service import AcmeApiService
 from etl.components.source_to_target_transformer import SourceToTargetTransformer
 from etl.components.target_writer import TargetWriter
-from etl.etl_orchestrator import EtlOrchestrator
+from etl.example_databricks_task import ExampleDatabricksTask
 from etl.types.etl_config import EtlConfig
-
 from utils.logging_utils_simple import log_method
 
 
-class EtlFactory:
+class ExampleDatabricksTaskFactory:
     """
-    Creates and wires the ETL components.
+    Creates and wires the tasks for a Databricks job.
 
     This keeps construction/configuration separate from orchestration.
     """
@@ -24,9 +23,9 @@ class EtlFactory:
     )
     def create(
         config: EtlConfig,
-    ) -> EtlOrchestrator:
+    ) -> ExampleDatabricksTask:
 
-        source_reader = SourceReader(
+        api_service = AcmeApiService(
             source_name=config.source_name,
             batch_size=config.batch_size,
         )
@@ -38,8 +37,8 @@ class EtlFactory:
             batch_size=config.batch_size,
         )
 
-        return EtlOrchestrator(
-            source_reader=source_reader,
+        return ExampleDatabricksTask(
+            api_service=api_service,
             transformer=transformer,
             target_writer=target_writer,
         )
