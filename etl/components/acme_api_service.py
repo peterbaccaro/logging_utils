@@ -1,6 +1,9 @@
+import logging
 from typing import Any, Iterator
 
 from utils.logging_utils_simple import log_generator
+
+logger = logging.getLogger(__name__)
 
 
 class AcmeApiService:
@@ -35,6 +38,7 @@ class AcmeApiService:
         Each yielded list represents one page from the source API and contains
         at most ``batch_size`` records.
         """
+        logger.info("Starting to read customer pages from source API: %s", self.source_name)
 
         for page_start in range(1, 237, self.batch_size):
             page_end = min(page_start + self.batch_size, 237)
