@@ -133,9 +133,7 @@ def test_is_enabled_for_contains_logger_errors() -> None:
 
 def test_safe_log_contains_logger_errors() -> None:
     class BadLogger:
-        def log(
-            self, level: int, message: object, *args: object, **kwargs: object
-        ) -> None:
+        def log(self, level: int, message: object, *args: object, **kwargs: object) -> None:
             raise RuntimeError("handler failed")
 
     logger = BadLogger()
@@ -178,14 +176,8 @@ def test_log_method_logs_exceptions_by_default(
     with pytest.raises(ValueError, match="method failure"):
         fail()
 
-    assert (
-        "EXCEPTION test_log_method_logs_exceptions_by_default.<locals>.fail"
-        in caplog.text
-    )
-    assert (
-        "END test_log_method_logs_exceptions_by_default.<locals>.fail status=failed"
-        in caplog.text
-    )
+    assert "EXCEPTION test_log_method_logs_exceptions_by_default.<locals>.fail" in caplog.text
+    assert "END test_log_method_logs_exceptions_by_default.<locals>.fail status=failed" in caplog.text
 
 
 def test_log_method_can_disable_exception_logging(
@@ -201,10 +193,7 @@ def test_log_method_can_disable_exception_logging(
         fail()
 
     assert "EXCEPTION" not in caplog.text
-    assert (
-        "END test_log_method_can_disable_exception_logging.<locals>.fail status=failed"
-        in caplog.text
-    )
+    assert "END test_log_method_can_disable_exception_logging.<locals>.fail status=failed" in caplog.text
 
 
 @pytest.mark.parametrize(
@@ -234,10 +223,7 @@ def test_log_generator_defers_start_until_iteration(
     generated = values()
     assert "START" not in caplog.text
     assert next(generated) == 1
-    assert (
-        "START test_log_generator_defers_start_until_iteration.<locals>.values"
-        in caplog.text
-    )
+    assert "START test_log_generator_defers_start_until_iteration.<locals>.values" in caplog.text
     cast(Generator[int, None, None], generated).close()
     assert "status=closed" in caplog.text
 
@@ -292,11 +278,7 @@ def test_log_generator_reports_mixed_and_empty_metadata(
 
     list(mixed())
     list(empty())
-    end_messages = [
-        record.getMessage()
-        for record in caplog.records
-        if record.getMessage().startswith("END ")
-    ]
+    end_messages = [record.getMessage() for record in caplog.records if record.getMessage().startswith("END ")]
 
     assert "items_yielded=2 yielded_type=mixed" in end_messages[0]
     assert "items_yielded=0" in end_messages[1]
@@ -345,9 +327,7 @@ def test_logging_failures_do_not_change_wrapped_behavior(
         def isEnabledFor(self, level: int) -> bool:
             return True
 
-        def log(
-            self, level: int, message: object, *args: object, **kwargs: object
-        ) -> None:
+        def log(self, level: int, message: object, *args: object, **kwargs: object) -> None:
             raise RuntimeError("logging failure")
 
     original_get_logger = logging_utils.logging.getLogger

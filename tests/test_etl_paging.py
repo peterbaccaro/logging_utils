@@ -25,9 +25,7 @@ def test_acme_api_service_yields_customer_pages_in_record_order(
 
     assert all(isinstance(page, list) for page in pages)
     assert [len(page) for page in pages] == expected_page_lengths
-    assert [record["source_id"] for page in pages for record in page] == list(
-        range(1, 237)
-    )
+    assert [record["source_id"] for page in pages for record in page] == list(range(1, 237))
 
 
 def test_acme_api_service_rejects_non_positive_batch_size() -> None:

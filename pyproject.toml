@@ -1,14 +1,14 @@
 [tool.black]
-line-length = 88
+line-length = 120
 target-version = ["py312"]
 
 [tool.isort]
 profile = "black"
-line_length = 88
+line_length = 120
 py_version = 310
 
 [tool.flake8]
-max-line-length = 88
+max-line-length = 120
 extend-ignore = ["E203", "W503"]
 extend-exclude = [".venv"]
 

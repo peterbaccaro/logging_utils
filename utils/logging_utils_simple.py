@@ -35,9 +35,7 @@ def configure_logging(level: int = logging.INFO) -> None:
     if not root_logger.handlers:
         handler = logging.StreamHandler(sys.stdout)
 
-        handler.setFormatter(
-            logging.Formatter("%(asctime)s %(levelname)s %(name)s - %(message)s")
-        )
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s - %(message)s"))
 
         root_logger.addHandler(handler)
 
@@ -606,18 +604,14 @@ def log_generator(
                     elif result_type is not yielded_type:
                         mixed_yield_types = True
 
-                    should_log_yield = log_yields and (
-                        log_yields_every is None or count % log_yields_every == 0
-                    )
+                    should_log_yield = log_yields and (log_yields_every is None or count % log_yields_every == 0)
 
                     if should_log_yield and _is_enabled_for(logger, log_level):
 
                         interval_duration_ms = None
                         if log_yield_interval_duration:
                             now = time.perf_counter()
-                            interval_duration_ms = (
-                                now - previous_logged_yield_time
-                            ) * 1_000
+                            interval_duration_ms = (now - previous_logged_yield_time) * 1_000
                             previous_logged_yield_time = now
 
                         _log_yield(
@@ -690,9 +684,7 @@ def log_generator(
                 if log_generator_metadata and _is_enabled_for(logger, log_level):
                     extra_fields.append(f"items_yielded={count}")
                     if yielded_type is not None:
-                        yielded_type_name = (
-                            "mixed" if mixed_yield_types else yielded_type.__name__
-                        )
+                        yielded_type_name = "mixed" if mixed_yield_types else yielded_type.__name__
                         extra_fields.append(f"yielded_type={yielded_type_name}")
 
                 _log_end(
