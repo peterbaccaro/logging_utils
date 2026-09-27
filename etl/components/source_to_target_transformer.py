@@ -13,9 +13,6 @@ class SourceToTargetTransformer:
         log_yields_every=100,
         log_final_yield=True,
         log_yield_interval_duration=True,
-        log_generator_metadata=True,
-        log_exceptions=True,
-        log_duration=True,
     )
     def transform(
         self,

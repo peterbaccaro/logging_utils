@@ -25,10 +25,7 @@ class ExampleDatabricksTask:
         self.target_writer = target_writer
 
     @log_method(
-        log_start=True,
-        log_result_metadata=True,
         log_exceptions=True,
-        log_duration=True,
     )
     def run(self) -> dict[str, Any]:
         """

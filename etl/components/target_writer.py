@@ -16,11 +16,7 @@ class TargetWriter:
         self.target_name = target_name
         self.batch_size = batch_size
 
-    @log_method(
-        log_result_metadata=True,
-        log_exceptions=True,
-        log_duration=True,
-    )
+    @log_method()
     def write(
         self,
         records: Iterator[dict[str, Any]],
@@ -67,11 +63,7 @@ class TargetWriter:
             "batches_written": batches_written,
         }
 
-    @log_method(
-        log_result_metadata=True,
-        log_exceptions=True,
-        log_duration=True,
-    )
+    @log_method()
     def _write_batch(
         self,
         batch: list[dict[str, Any]],

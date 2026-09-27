@@ -17,9 +17,7 @@ class ExampleDatabricksTaskFactory:
 
     @staticmethod
     @log_method(
-        log_result_metadata=True,
         log_exceptions=True,
-        log_duration=True,
     )
     def create(
         config: EtlConfig,

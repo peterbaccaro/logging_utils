@@ -27,9 +27,6 @@ class AcmeApiService:
         log_yields_every=1,
         log_final_yield=True,
         log_yield_interval_duration=True,
-        log_generator_metadata=True,
-        log_exceptions=True,
-        log_duration=True,
     )
     def get_customers_iter(self) -> Iterator[list[dict[str, Any]]]:
         """

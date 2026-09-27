@@ -5,7 +5,7 @@ import functools
 import logging
 import sys
 import time
-from collections.abc import Callable, Generator, Iterator
+from collections.abc import Callable, Generator, Iterator, Sized
 from contextlib import contextmanager
 from typing import Any, ParamSpec, TypeVar
 
@@ -113,21 +113,7 @@ def _get_result_metadata(result: Any) -> str:
     except Exception:
         result_type = "unknown"
 
-    if any(
-        result_class is supported_type
-        for supported_type in (
-            str,
-            bytes,
-            bytearray,
-            list,
-            tuple,
-            dict,
-            set,
-            frozenset,
-            range,
-            memoryview,
-        )
-    ):
+    if isinstance(result, Sized):
         try:
             result_length = len(result)
             return f"type={result_type} length={result_length}"
@@ -230,7 +216,7 @@ def _log_exception(
 
     _safe_log(
         logger,
-        logging.EXCEPTION,
+        logging.ERROR,
         " ".join(parts),
         exc_info=True,
     )
@@ -379,9 +365,9 @@ def _log_yield(
 def log_method(
     *,
     log_start: bool = True,
-    log_result_metadata: bool = False,
+    log_result_metadata: bool = True,
     log_exceptions: bool = False,
-    log_duration: bool = False,
+    log_duration: bool = True,
     log_level: int = logging.INFO,
 ) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
     """
@@ -490,9 +476,9 @@ def log_generator(
     log_yields_every: int | None = None,
     log_final_yield: bool = False,
     log_yield_interval_duration: bool = False,
-    log_generator_metadata: bool = False,
+    log_generator_metadata: bool = True,
     log_exceptions: bool = False,
-    log_duration: bool = False,
+    log_duration: bool = True,
     log_level: int = logging.INFO,
 ) -> Callable[
     [Callable[_P, Iterator[_YieldT]]],
@@ -596,7 +582,8 @@ def log_generator(
 
                     count += 1
                     has_yielded = True
-                    last_yielded_result = result
+                    if log_final_yield:
+                        last_yielded_result = result
 
                     result_type = type(result)
                     if yielded_type is None:
